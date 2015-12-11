@@ -12,28 +12,34 @@
  * @author Website: http://darrenonthe.net
  *
  */
-(function($) {
+(function ($) {
 
-    $.fn.characterCounter = function(opts){
+    $.fn.characterCounter = function (opts) {
 
         var defaults = {
-            exceeded: false,
             counterSelector: false,
-            limit: 150,
-            renderTotal: false,
+            limit: 100,
+            renderTotal: true,
             counterWrapper: 'span',
             counterCssClass: 'counter',
-            counterFormat: '%1',
+            counterFormat: '%1 chars',
+            exceeded: false,
             counterExceededCssClass: 'exceeded',
-            increaseCounting: false,
-            onExceed: function(count) {},
-            onDeceed: function(count) {},
+            onExceed: function (count) {},
+            onDeceed: function (count) {},
+            increaseCounting: true,
+            targetRange: { "lower":0, "upper": 0},
+            hit: false,
+            counterMissedCssClass: 'counter-missed',
+            counterHitCssClass: 'counter-hit',
+            onMissed: function (count) {},
+            onHit: function (count) {},
             customFields: {}
         };
 
         var options = $.extend(defaults, opts);
 
-        return this.each(function() {
+        return this.each(function () {
             var html5len = $(this).attr('maxlength');
             if (typeof html5len !== typeof undefined && html5len !== false) {
                 $.extend(defaults, {
@@ -47,65 +53,68 @@
             checkCount(this);
         });
 
-        function customFields(params)
-        {
-            var i, html='';
+        function customFields(params) {
+            var i, html = '';
 
-            for (i in params)
-            {
+            for (i in params) {
                 html += ' ' + i + '="' + params[i] + '"';
             }
 
             return html;
         }
 
-        function generateCounter()
-        {
+        function generateCounter() {
             var classString = options.counterCssClass;
 
-            if ( options.customFields['class'] )
-            {
+            if (options.customFields['class']) {
                 classString += " " + options.customFields['class'];
                 delete options.customFields['class'];
             }
 
-            return '<'+ options.counterWrapper +customFields(options.customFields)+' class="' + classString + '"></'+ options.counterWrapper +'>';
+            return '<' + options.counterWrapper + customFields(options.customFields) + ' class="' + classString + '"></' + options.counterWrapper + '>';
         }
 
-        function renderText(count)
-        {
-            var rendered_count = options.counterFormat.replace(/%1/, count);
-
-            if ( options.renderTotal )
-            {
-                rendered_count += '/'+ options.limit;
+        function renderText(count) {
+            var renderedCount = options.counterFormat;
+            if (options.renderTotal) {
+                renderedCount = renderedCount.replace(/%1/, '%1/' + options.limit);
             }
-
-            return rendered_count;
+            renderedCount = renderedCount.replace(/%1/, count);
+            return renderedCount;
         }
 
-        function checkCount(element)
-        {
+        function checkCount(element) {
             var characterCount = $(element).val().length;
             var counter = options.counterSelector ? $(options.counterSelector) : $(element).nextAll("." + options.counterCssClass).first();
             var remaining = options.limit - characterCount;
             var condition = remaining < 0;
 
-            if ( options.increaseCounting )
-            {
+            if (options.increaseCounting) {
                 remaining = characterCount;
                 condition = remaining > options.limit;
+                if (options.targetRange['lower'] >= 0 && options.targetRange['upper']) {
+                    if (characterCount <= options.targetRange['upper'] && characterCount >= options.targetRange['lower']) {
+                        $(element).addClass(options.counterHitCssClass);
+                        $(element).removeClass(options.counterMissedCssClass);
+                        options.hit = true;
+                        options.onHit(characterCount);
+                    } else {
+                        if (options.hit) {
+                            $(element).addClass(options.counterMissedCssClass);
+                            $(element).removeClass(options.counterHitCssClass);
+                            options.onMissed(characterCount);
+                            options.exceeded = false;
+                        }
+                    }
+                }
             }
 
-            if ( condition )
-            {
+            if (condition) {
                 counter.addClass(options.counterExceededCssClass);
                 options.exceeded = true;
                 options.onExceed(characterCount);
-            }
-            else
-            {
-                if ( options.exceeded ) {
+            } else {
+                if (options.exceeded) {
                     counter.removeClass(options.counterExceededCssClass);
                     options.onDeceed(characterCount);
                     options.exceeded = false;
@@ -115,8 +124,7 @@
             counter.html(renderText(remaining));
         }
 
-        function bindEvents(element)
-        {
+        function bindEvents(element) {
             $(element)
                 .on("input change", function () {
                     checkCount(element);
